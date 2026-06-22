@@ -1,0 +1,2141 @@
+
+
+cat > /mnt/user-data/outputs/gamehub.html << 'HTMLEOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GameHub — Xbox Cloud Gaming</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET & BASE ─────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;font-family:'Inter',sans-serif;background:#000;color:#fff;user-select:none;-webkit-user-select:none}
+button{font-family:'Inter',sans-serif;cursor:pointer;border:none;background:none;color:inherit}
+input{font-family:'Inter',sans-serif}
+
+/* ─── PS5 LAYOUT ────────────────────────────────────────────── */
+#ps5-shell{
+  position:fixed;inset:0;
+  display:flex;flex-direction:column;
+  background:#0d1117;
+  overflow:hidden;
+}
+
+/* Dynamic background — full-screen art blur */
+#bg-art{
+  position:absolute;inset:0;z-index:0;
+  background-size:cover;background-position:center;
+  transition:background-image .6s ease, opacity .4s ease;
+  filter:blur(40px) brightness(.35) saturate(1.4);
+  transform:scale(1.08);
+}
+#bg-overlay{
+  position:absolute;inset:0;z-index:1;
+  background:linear-gradient(180deg,
+    rgba(0,0,0,.15) 0%,
+    rgba(0,0,0,.05) 35%,
+    rgba(0,0,0,.55) 70%,
+    rgba(0,0,0,.85) 100%);
+}
+
+/* ─── TOP BAR (PS5 style) ───────────────────────────────────── */
+#topbar{
+  position:relative;z-index:100;
+  height:52px;
+  display:flex;align-items:center;
+  padding:0 28px;
+  gap:0;
+  flex-shrink:0;
+}
+.topbar-logo{
+  font-size:17px;font-weight:800;letter-spacing:1.5px;
+  color:#fff;margin-right:32px;
+  display:flex;align-items:center;gap:7px;
+}
+.topbar-logo-icon{
+  width:26px;height:26px;
+  background:linear-gradient(135deg,#107c10,#0ea5e9);
+  border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;
+}
+/* PS5-style nav tabs */
+#main-tabs{
+  display:flex;align-items:center;gap:2px;flex:1;
+}
+.main-tab{
+  padding:7px 18px;border-radius:20px;
+  font-size:13px;font-weight:600;letter-spacing:.2px;
+  color:rgba(255,255,255,.55);
+  transition:all .18s ease;
+  position:relative;
+  white-space:nowrap;
+}
+.main-tab:hover{color:rgba(255,255,255,.85)}
+.main-tab.active{
+  color:#fff;
+  background:rgba(255,255,255,.12);
+}
+.main-tab:focus-visible{outline:2px solid #fff;outline-offset:2px;border-radius:20px}
+
+#topbar-right{display:flex;align-items:center;gap:8px;margin-left:auto}
+.tb-icon{
+  width:32px;height:32px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  color:rgba(255,255,255,.65);
+  transition:all .18s ease;
+  font-size:15px;
+}
+.tb-icon:hover,.tb-icon.focused{color:#fff;background:rgba(255,255,255,.12)}
+.tb-icon:focus-visible{outline:2px solid #fff;border-radius:50%}
+#topbar-clock{
+  font-size:13px;font-weight:600;color:rgba(255,255,255,.7);
+  min-width:60px;text-align:right;
+}
+#user-chip{
+  display:flex;align-items:center;gap:7px;
+  padding:4px 10px 4px 4px;
+  border-radius:20px;
+  cursor:pointer;
+  transition:all .18s ease;
+}
+#user-chip:hover,.user-chip-focused{background:rgba(255,255,255,.1)}
+#user-chip:focus-visible{outline:2px solid #fff;border-radius:20px}
+.uc-avatar{
+  width:26px;height:26px;border-radius:50%;
+  background:linear-gradient(135deg,#107c10,#0ea5e9);
+  display:flex;align-items:center;justify-content:center;
+  font-size:13px;overflow:hidden;flex-shrink:0;
+}
+.uc-avatar img{width:100%;height:100%;object-fit:cover}
+.uc-name{font-size:12px;font-weight:600;color:rgba(255,255,255,.8)}
+
+/* ─── MAIN CONTENT AREA ─────────────────────────────────────── */
+#content-area{
+  position:relative;z-index:10;
+  flex:1;overflow:hidden;
+  display:flex;flex-direction:column;
+}
+
+/* ─── PAGE SYSTEM ───────────────────────────────────────────── */
+.page{display:none;flex:1;overflow:hidden}
+.page.active{display:flex;flex-direction:column}
+
+/* ══════════════════════════════════════════════════════════════
+   HOME PAGE — exact PS5 layout
+══════════════════════════════════════════════════════════════ */
+#page-home{position:relative}
+
+/* Game card row — PS5 top strip */
+#game-strip-wrap{
+  padding:12px 24px 0;
+  flex-shrink:0;
+}
+#game-strip{
+  display:flex;gap:10px;
+  overflow-x:auto;overflow-y:visible;
+  scroll-snap-type:x mandatory;
+  padding:8px 4px 16px;
+  scrollbar-width:none;
+}
+#game-strip::-webkit-scrollbar{display:none}
+
+/* PS5 game card */
+.ps-card{
+  flex-shrink:0;
+  width:120px;
+  scroll-snap-align:start;
+  cursor:pointer;
+  position:relative;
+  transition:transform .2s ease;
+  outline:none;
+}
+.ps-card-inner{
+  border-radius:10px;
+  overflow:hidden;
+  border:2px solid transparent;
+  transition:border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+  background:#1a1f2e;
+}
+.ps-card.focused .ps-card-inner,
+.ps-card:hover .ps-card-inner{
+  border-color:#fff;
+  box-shadow:0 0 0 1px rgba(255,255,255,.3), 0 12px 32px rgba(0,0,0,.6);
+  transform:translateY(-6px) scale(1.04);
+}
+.ps-card-img{
+  width:120px;height:160px;
+  object-fit:cover;
+  display:block;
+  background:#1a1f2e;
+}
+.ps-card-img.loading{
+  background:linear-gradient(135deg,#1a1f2e,#252b3a);
+  animation:shimmer 1.5s infinite;
+}
+@keyframes shimmer{0%,100%{opacity:1}50%{opacity:.6}}
+.ps-card-label{
+  font-size:10px;font-weight:600;
+  color:rgba(255,255,255,.5);
+  text-align:center;padding:5px 4px 7px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  line-height:1.3;
+}
+.focused-label{
+  font-size:11px;font-weight:700;
+  color:#fff;
+}
+/* Card badge */
+.card-badge{
+  position:absolute;top:6px;left:6px;
+  font-size:8px;font-weight:800;letter-spacing:.8px;text-transform:uppercase;
+  padding:2px 6px;border-radius:3px;
+  background:rgba(16,124,16,.9);color:#fff;
+  pointer-events:none;
+}
+
+/* ─── PS5 HERO SECTION ─────────────────────────────────────── */
+#hero-section{
+  flex:1;
+  display:flex;
+  align-items:flex-end;
+  padding:0 44px 28px;
+  position:relative;
+}
+#hero-game-art{
+  position:absolute;right:0;top:-20px;bottom:0;
+  width:60%;
+  pointer-events:none;
+}
+#hero-game-art img{
+  position:absolute;right:0;bottom:0;
+  max-height:calc(100% + 40px);
+  max-width:100%;
+  object-fit:contain;object-position:bottom right;
+  filter:drop-shadow(-20px 0 40px rgba(0,0,0,.5));
+  transition:opacity .5s ease, transform .5s ease;
+  opacity:0;transform:translateX(20px);
+}
+#hero-game-art img.visible{opacity:1;transform:translateX(0)}
+
+#hero-info{
+  position:relative;z-index:2;
+  max-width:420px;
+}
+#hero-game-logo{
+  max-width:260px;max-height:80px;
+  object-fit:contain;object-position:left center;
+  margin-bottom:10px;
+  filter:drop-shadow(0 2px 8px rgba(0,0,0,.5));
+  display:none;
+}
+#hero-title-text{
+  font-size:38px;font-weight:900;
+  line-height:1.05;letter-spacing:-.5px;
+  text-shadow:0 2px 16px rgba(0,0,0,.6);
+  margin-bottom:8px;
+}
+#hero-subtitle{
+  font-size:13px;color:rgba(255,255,255,.65);
+  line-height:1.6;margin-bottom:18px;max-width:340px;
+}
+#hero-meta{
+  display:flex;align-items:center;gap:12px;
+  margin-bottom:18px;font-size:11px;color:rgba(255,255,255,.5);
+}
+.hero-rating{
+  background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:4px;padding:2px 7px;
+  font-weight:700;color:rgba(255,255,255,.8);
+}
+
+/* PS5 action buttons */
+#hero-actions{display:flex;gap:10px;align-items:center}
+.ps-btn{
+  padding:11px 22px;border-radius:6px;
+  font-size:13px;font-weight:700;letter-spacing:.2px;
+  transition:all .18s ease;
+  display:flex;align-items:center;gap:7px;
+  outline:none;
+  white-space:nowrap;
+}
+.ps-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.ps-btn-primary{
+  background:#fff;color:#000;
+}
+.ps-btn-primary:hover,.ps-btn-primary.focused{background:#e0e0e0}
+.ps-btn-secondary{
+  background:rgba(255,255,255,.15);color:#fff;
+  backdrop-filter:blur(10px);
+  border:1px solid rgba(255,255,255,.2);
+}
+.ps-btn-secondary:hover,.ps-btn-secondary.focused{background:rgba(255,255,255,.25)}
+
+/* PS5 trophy / progress */
+#hero-progress{
+  position:absolute;right:44px;bottom:28px;
+  display:flex;align-items:center;gap:16px;
+  z-index:2;
+}
+.trophy-stat{text-align:right}
+.trophy-stat-label{font-size:11px;color:rgba(255,255,255,.5)}
+.trophy-stat-value{font-size:18px;font-weight:700;color:#fff}
+.trophy-icon{
+  width:36px;height:36px;
+  background:rgba(255,255,255,.1);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:18px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STORE PAGE
+══════════════════════════════════════════════════════════════ */
+#page-store{padding:20px 28px;overflow-y:auto;gap:0}
+#page-store::-webkit-scrollbar{width:3px}
+#page-store::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15)}
+
+.store-top{
+  display:flex;align-items:center;gap:14px;
+  margin-bottom:20px;flex-wrap:wrap;
+}
+.store-top h1{font-size:22px;font-weight:800;flex:1}
+.store-search-wrap{
+  display:flex;align-items:center;gap:8px;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:8px;padding:8px 14px;
+  width:260px;
+}
+.store-search-wrap:focus-within{border-color:rgba(255,255,255,.35)}
+.store-search-wrap svg{width:14px;height:14px;color:rgba(255,255,255,.4);flex-shrink:0}
+.store-search-wrap input{
+  background:none;border:none;outline:none;
+  font-size:13px;color:#fff;width:100%;
+}
+.store-search-wrap input::placeholder{color:rgba(255,255,255,.35)}
+.genre-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:20px}
+.genre-btn{
+  padding:6px 14px;border-radius:20px;
+  font-size:12px;font-weight:600;
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.12);
+  color:rgba(255,255,255,.6);
+  transition:all .16s ease;
+  outline:none;
+}
+.genre-btn:hover,.genre-btn:focus-visible{background:rgba(255,255,255,.15);color:#fff}
+.genre-btn.active{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.4);color:#fff}
+.genre-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+#store-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
+  gap:14px;
+}
+.store-card{
+  background:#1a1f2e;border-radius:10px;
+  overflow:hidden;cursor:pointer;
+  border:2px solid transparent;
+  transition:all .18s ease;
+  outline:none;
+}
+.store-card:hover,.store-card.focused{
+  border-color:rgba(255,255,255,.5);
+  transform:translateY(-4px);
+  box-shadow:0 14px 32px rgba(0,0,0,.5);
+}
+.store-card:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.store-card-img{
+  width:100%;aspect-ratio:3/4;
+  object-fit:cover;background:#252b3a;
+  display:block;
+}
+.store-card-body{padding:9px 10px 11px}
+.store-card-title{font-size:11px;font-weight:700;line-height:1.3;margin-bottom:3px;color:#fff}
+.store-card-genre{font-size:10px;color:rgba(255,255,255,.4)}
+.store-add-btn{
+  margin-top:8px;width:100%;
+  padding:7px;border-radius:5px;
+  font-size:11px;font-weight:700;
+  background:rgba(16,124,16,.85);color:#fff;
+  transition:all .16s ease;
+}
+.store-add-btn:hover{background:#107c10}
+.store-add-btn.in-lib{background:rgba(255,255,255,.1);color:rgba(255,255,255,.5);cursor:default}
+#store-loading{
+  grid-column:1/-1;text-align:center;
+  padding:60px;color:rgba(255,255,255,.4);font-size:14px;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   LIBRARY PAGE
+══════════════════════════════════════════════════════════════ */
+#page-library{padding:20px 28px;overflow-y:auto;gap:0}
+#page-library::-webkit-scrollbar{width:3px}
+#page-library::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15)}
+
+.lib-toolbar{
+  display:flex;align-items:center;gap:10px;
+  margin-bottom:20px;flex-wrap:wrap;
+}
+.lib-toolbar h1{font-size:22px;font-weight:800}
+.lib-sort{
+  background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);
+  border-radius:6px;padding:7px 12px;
+  font-size:12px;font-weight:600;color:#fff;
+  outline:none;cursor:pointer;
+}
+.lib-sort:focus-visible{outline:2px solid #fff}
+.layout-btns{display:flex;gap:4px;margin-left:auto}
+.layout-btn{
+  width:30px;height:30px;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.07);
+  border:1px solid rgba(255,255,255,.1);
+  color:rgba(255,255,255,.5);
+  transition:all .16s ease;cursor:pointer;
+}
+.layout-btn:hover,.layout-btn.active{background:rgba(255,255,255,.15);color:#fff}
+.layout-btn:focus-visible{outline:2px solid #fff;border-radius:6px}
+#lib-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(148px,1fr));
+  gap:14px;
+}
+#lib-grid.list{grid-template-columns:1fr}
+#lib-grid.list .store-card{display:flex;flex-direction:row}
+#lib-grid.list .store-card-img{width:72px;height:72px;aspect-ratio:auto;flex-shrink:0}
+#lib-grid.list .store-card-body{flex:1;display:flex;align-items:center;gap:16px}
+#lib-grid.list .store-add-btn{width:auto;padding:6px 14px;margin-top:0;margin-left:auto}
+.lib-empty{
+  grid-column:1/-1;text-align:center;
+  padding:80px 40px;color:rgba(255,255,255,.3);
+}
+.lib-empty h3{font-size:20px;font-weight:700;margin-bottom:8px;color:rgba(255,255,255,.5)}
+.lib-empty p{font-size:14px;line-height:1.7;margin-bottom:20px}
+
+/* ══════════════════════════════════════════════════════════════
+   NEWS PAGE
+══════════════════════════════════════════════════════════════ */
+#page-news{padding:20px 28px;overflow-y:auto;gap:0}
+#page-news::-webkit-scrollbar{width:3px}
+#page-news::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15)}
+.news-page-title{font-size:22px;font-weight:800;margin-bottom:20px}
+#news-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:14px;
+}
+.news-card{
+  background:#1a1f2e;border-radius:10px;overflow:hidden;
+  cursor:pointer;border:2px solid transparent;
+  transition:all .18s ease;outline:none;
+}
+.news-card:hover,.news-card.focused{
+  border-color:rgba(255,255,255,.35);
+  transform:translateY(-3px);
+}
+.news-card:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.news-card-thumb{
+  width:100%;height:150px;object-fit:cover;background:#252b3a;display:block;
+}
+.news-card-body{padding:14px}
+.news-card-tag{font-size:9px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#0ea5e9;margin-bottom:6px}
+.news-card-title{font-size:13px;font-weight:700;line-height:1.5;color:#fff}
+.news-card-date{font-size:11px;color:rgba(255,255,255,.35);margin-top:8px}
+
+/* ══════════════════════════════════════════════════════════════
+   PROFILE PAGE
+══════════════════════════════════════════════════════════════ */
+#page-profile{padding:20px 28px;overflow-y:auto;gap:0}
+#page-profile::-webkit-scrollbar{width:3px}
+#page-profile::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15)}
+.profile-banner-wrap{
+  border-radius:14px;overflow:hidden;
+  height:160px;margin-bottom:0;
+  background:linear-gradient(135deg,#7c3aed,#0ea5e9,#107c10);
+  position:relative;
+}
+.profile-banner-img{width:100%;height:100%;object-fit:cover}
+.profile-banner-edit{
+  position:absolute;top:12px;right:12px;
+  padding:6px 12px;border-radius:6px;
+  background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.2);
+  font-size:12px;font-weight:600;cursor:pointer;color:#fff;
+  transition:all .16s ease;
+}
+.profile-banner-edit:hover{background:rgba(0,0,0,.7)}
+.profile-top-row{
+  display:flex;align-items:flex-end;gap:16px;
+  margin-top:-36px;padding:0 4px;margin-bottom:20px;
+}
+.profile-avatar-wrap{position:relative}
+.profile-av{
+  width:76px;height:76px;border-radius:50%;
+  border:4px solid #0d1117;
+  background:linear-gradient(135deg,#107c10,#0ea5e9);
+  display:flex;align-items:center;justify-content:center;
+  font-size:30px;overflow:hidden;cursor:pointer;flex-shrink:0;
+}
+.profile-av img{width:100%;height:100%;object-fit:cover}
+.av-edit-badge{
+  position:absolute;bottom:2px;right:2px;
+  width:22px;height:22px;border-radius:50%;
+  background:#0ea5e9;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;border:2px solid #0d1117;
+}
+.av-edit-badge svg{width:10px;height:10px;color:#fff}
+.profile-name-block{flex:1;padding-bottom:6px}
+.profile-display-name{font-size:22px;font-weight:800}
+.profile-handle{font-size:13px;color:rgba(255,255,255,.45);margin-top:3px}
+.profile-stats-row{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:12px;margin-bottom:24px;
+}
+.prof-stat{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;padding:14px 12px;text-align:center;
+}
+.prof-stat-val{font-size:26px;font-weight:800;color:#0ea5e9}
+.prof-stat-lbl{font-size:11px;color:rgba(255,255,255,.45);margin-top:3px}
+.section-heading{font-size:15px;font-weight:700;margin-bottom:14px;color:rgba(255,255,255,.85)}
+.achievements-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.ach-card{
+  background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);
+  border-radius:9px;padding:12px;display:flex;align-items:center;gap:12px;
+}
+.ach-icon{
+  width:40px;height:40px;border-radius:9px;flex-shrink:0;
+  background:linear-gradient(135deg,#0ea5e9,#7c3aed);
+  display:flex;align-items:center;justify-content:center;font-size:19px;
+}
+.ach-locked .ach-icon{background:rgba(255,255,255,.07);filter:grayscale(1)}
+.ach-locked{opacity:.45}
+.ach-info h4{font-size:12px;font-weight:700;color:#fff}
+.ach-info p{font-size:10px;color:rgba(255,255,255,.4);margin-top:2px}
+.ach-bar{height:3px;background:rgba(255,255,255,.1);border-radius:2px;margin-top:7px}
+.ach-fill{height:100%;border-radius:2px;background:linear-gradient(90deg,#0ea5e9,#7c3aed)}
+
+/* ══════════════════════════════════════════════════════════════
+   SETTINGS PAGE
+══════════════════════════════════════════════════════════════ */
+#page-settings{padding:20px 28px;overflow-y:auto;gap:0}
+#page-settings::-webkit-scrollbar{width:3px}
+#page-settings::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15)}
+.settings-layout{display:grid;grid-template-columns:200px 1fr;gap:16px;min-height:calc(100vh - 140px)}
+.settings-sidebar{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;padding:8px;align-self:start;
+}
+.set-nav-item{
+  padding:9px 12px;border-radius:7px;
+  font-size:13px;font-weight:600;
+  color:rgba(255,255,255,.55);
+  display:flex;align-items:center;gap:9px;
+  cursor:pointer;transition:all .15s ease;
+  outline:none;
+}
+.set-nav-item svg{width:15px;height:15px;flex-shrink:0}
+.set-nav-item:hover{color:#fff;background:rgba(255,255,255,.07)}
+.set-nav-item.active{color:#fff;background:rgba(255,255,255,.1)}
+.set-nav-item:focus-visible{outline:2px solid #fff;border-radius:7px}
+.settings-panel{
+  background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);
+  border-radius:10px;padding:22px;overflow-y:auto;
+}
+.set-panel-title{font-size:17px;font-weight:800;margin-bottom:18px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.07)}
+.set-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 0;border-bottom:1px solid rgba(255,255,255,.04);
+}
+.set-row:last-child{border-bottom:none}
+.set-row-lbl{font-size:13px;font-weight:600;color:#fff}
+.set-row-desc{font-size:11px;color:rgba(255,255,255,.4);margin-top:3px}
+.set-ctrl{flex-shrink:0;margin-left:20px}
+.toggle{
+  width:40px;height:22px;border-radius:11px;
+  background:rgba(255,255,255,.15);
+  position:relative;cursor:pointer;transition:background .18s ease;
+}
+.toggle.on{background:#107c10}
+.toggle::after{
+  content:'';position:absolute;
+  width:16px;height:16px;border-radius:50%;
+  background:#fff;top:3px;left:3px;
+  transition:left .18s ease;
+  box-shadow:0 1px 4px rgba(0,0,0,.3);
+}
+.toggle.on::after{left:21px}
+.set-select{
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);
+  border-radius:6px;color:#fff;padding:7px 10px;
+  font-size:12px;outline:none;cursor:pointer;
+}
+.set-select:focus-visible{outline:2px solid #fff}
+.color-swatches{display:flex;gap:7px;flex-wrap:wrap}
+.cswatch{
+  width:28px;height:28px;border-radius:50%;
+  cursor:pointer;transition:transform .15s ease;
+  border:2px solid transparent;
+}
+.cswatch:hover{transform:scale(1.15)}
+.cswatch.active{border-color:#fff;transform:scale(1.15)}
+.wallpaper-actions{display:flex;gap:8px}
+.set-btn{
+  padding:7px 14px;border-radius:6px;
+  font-size:12px;font-weight:700;
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);
+  color:#fff;cursor:pointer;transition:all .16s ease;
+}
+.set-btn:hover{background:rgba(255,255,255,.18)}
+.set-input{
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.15);
+  border-radius:6px;color:#fff;padding:7px 12px;
+  font-size:13px;outline:none;width:200px;
+}
+.set-input:focus{border-color:rgba(255,255,255,.4)}
+
+/* ── Bottom status bar ──────────────────────────────────────── */
+#statusbar{
+  position:relative;z-index:100;
+  height:36px;
+  display:flex;align-items:center;
+  padding:0 24px;
+  background:rgba(0,0,0,.4);
+  border-top:1px solid rgba(255,255,255,.06);
+  flex-shrink:0;gap:20px;
+}
+.sb-item{display:flex;align-items:center;gap:6px;font-size:11px;color:rgba(255,255,255,.4)}
+.sb-dot{width:6px;height:6px;border-radius:50%;background:#22c55e;box-shadow:0 0 5px #22c55e}
+.sb-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+/* Controller hint */
+.ctrl-hint{
+  display:flex;align-items:center;gap:5px;
+  font-size:10px;color:rgba(255,255,255,.3);
+}
+.ctrl-btn{
+  width:16px;height:16px;border-radius:50%;
+  background:rgba(255,255,255,.15);
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:8px;font-weight:800;color:rgba(255,255,255,.6);
+}
+
+/* ── MODALS ─────────────────────────────────────────────────── */
+.modal-backdrop{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(0,0,0,.75);
+  backdrop-filter:blur(20px);
+  display:none;align-items:center;justify-content:center;
+}
+.modal-backdrop.open{display:flex}
+.modal-box{
+  background:#1a1f2e;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:16px;overflow:hidden;
+  max-width:500px;width:90%;
+  box-shadow:0 32px 80px rgba(0,0,0,.7);
+  animation:modalIn .25s ease;
+}
+@keyframes modalIn{from{opacity:0;transform:scale(.95) translateY(8px)}to{opacity:1;transform:scale(1) translateY(0)}}
+/* launch modal */
+#launch-art{
+  height:200px;width:100%;
+  object-fit:cover;background:#252b3a;
+  display:block;font-size:0;
+}
+.launch-body{padding:24px}
+.launch-title{font-size:22px;font-weight:800;margin-bottom:6px}
+.launch-desc{font-size:13px;color:rgba(255,255,255,.6);line-height:1.6;margin-bottom:20px}
+.launch-acts{display:flex;gap:10px}
+/* auth modal */
+.auth-box{
+  background:#1a1f2e;border:1px solid rgba(255,255,255,.12);
+  border-radius:16px;padding:36px;
+  max-width:400px;width:90%;text-align:center;
+  animation:modalIn .25s ease;
+}
+.auth-logo{
+  font-size:24px;font-weight:900;letter-spacing:1px;
+  margin-bottom:6px;
+}
+.auth-logo span{color:#107c10}
+.auth-sub{font-size:13px;color:rgba(255,255,255,.5);line-height:1.6;margin-bottom:28px}
+.ms-login-btn{
+  width:100%;padding:13px;border-radius:8px;
+  background:#fff;color:#000;
+  font-size:14px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  cursor:pointer;transition:all .16s ease;margin-bottom:10px;
+  border:none;font-family:'Inter',sans-serif;
+}
+.ms-login-btn:hover{background:#f0f0f0}
+.auth-divider{
+  display:flex;align-items:center;gap:12px;
+  color:rgba(255,255,255,.25);font-size:11px;margin:14px 0;
+}
+.auth-divider::before,.auth-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.1)}
+.guest-login-btn{
+  width:100%;padding:12px;border-radius:8px;
+  background:transparent;border:1px solid rgba(255,255,255,.15);
+  color:rgba(255,255,255,.7);font-size:13px;font-weight:600;
+  cursor:pointer;transition:all .16s ease;font-family:'Inter',sans-serif;
+}
+.guest-login-btn:hover{background:rgba(255,255,255,.07);color:#fff}
+/* news modal */
+.news-modal-art{height:220px;width:100%;object-fit:cover;background:#252b3a;display:block;font-size:0}
+.news-modal-body{padding:24px}
+.news-modal-tag{font-size:10px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;color:#0ea5e9;margin-bottom:8px}
+.news-modal-title{font-size:20px;font-weight:800;margin-bottom:12px}
+.news-modal-text{font-size:13px;color:rgba(255,255,255,.65);line-height:1.8}
+.news-modal-date{font-size:11px;color:rgba(255,255,255,.35);margin-top:14px}
+.modal-close{
+  position:absolute;top:14px;right:14px;
+  width:30px;height:30px;border-radius:50%;
+  background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.15);
+  color:#fff;font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s ease;z-index:2;
+}
+.modal-close:hover{background:rgba(0,0,0,.8)}
+/* avatar picker */
+.av-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px}
+.av-opt{
+  width:44px;height:44px;border-radius:50%;border:2px solid transparent;
+  background:rgba(255,255,255,.07);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:22px;
+  transition:all .15s ease;
+}
+.av-opt:hover,.av-opt.active{border-color:#0ea5e9}
+
+/* ── SEARCH OVERLAY ─────────────────────────────────────────── */
+#search-overlay{
+  position:fixed;inset:0;z-index:600;
+  background:rgba(0,0,0,.8);backdrop-filter:blur(24px);
+  display:none;flex-direction:column;align-items:center;
+  padding-top:80px;
+}
+#search-overlay.open{display:flex}
+.search-wrap{
+  width:100%;max-width:600px;
+  background:#1a1f2e;border:1px solid rgba(255,255,255,.15);
+  border-radius:14px;overflow:hidden;
+  box-shadow:0 24px 64px rgba(0,0,0,.6);
+}
+.search-input-row{
+  display:flex;align-items:center;gap:12px;
+  padding:16px 18px;border-bottom:1px solid rgba(255,255,255,.07);
+}
+.search-input-row svg{width:18px;height:18px;color:rgba(255,255,255,.35);flex-shrink:0}
+.search-input-row input{
+  flex:1;background:none;border:none;outline:none;
+  font-size:16px;color:#fff;font-weight:500;
+}
+.search-input-row input::placeholder{color:rgba(255,255,255,.3)}
+.search-results{padding:8px;max-height:400px;overflow-y:auto}
+.sr-item{
+  display:flex;align-items:center;gap:12px;
+  padding:9px 11px;border-radius:8px;cursor:pointer;
+  transition:background .14s ease;
+}
+.sr-item:hover{background:rgba(255,255,255,.07)}
+.sr-thumb{
+  width:40px;height:52px;border-radius:6px;
+  object-fit:cover;background:#252b3a;flex-shrink:0;
+}
+.sr-info h4{font-size:13px;font-weight:700;color:#fff}
+.sr-info p{font-size:11px;color:rgba(255,255,255,.4)}
+.sr-empty{padding:32px;text-align:center;color:rgba(255,255,255,.35);font-size:13px}
+.sr-section-label{
+  padding:6px 11px;font-size:10px;font-weight:800;
+  letter-spacing:1.2px;text-transform:uppercase;color:rgba(255,255,255,.3);
+}
+
+/* ── TOAST ──────────────────────────────────────────────────── */
+#toast-wrap{
+  position:fixed;bottom:52px;right:24px;
+  z-index:2000;display:flex;flex-direction:column;gap:8px;
+}
+.toast{
+  background:#1a1f2e;border:1px solid rgba(255,255,255,.12);
+  border-radius:9px;padding:12px 16px;
+  font-size:12px;font-weight:600;color:#fff;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);
+  display:flex;align-items:center;gap:9px;
+  max-width:300px;
+  animation:toastIn .28s ease forwards;
+}
+.toast.removing{animation:toastOut .28s ease forwards}
+@keyframes toastIn{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes toastOut{to{opacity:0;transform:translateX(12px)}}
+.toast.success{border-color:rgba(16,124,16,.5)}
+.toast.info{border-color:rgba(14,165,233,.4)}
+
+/* ── GUEST BANNER ───────────────────────────────────────────── */
+#guest-banner{
+  position:relative;z-index:100;
+  background:linear-gradient(90deg,rgba(16,124,16,.15),rgba(14,165,233,.1));
+  border-bottom:1px solid rgba(255,255,255,.07);
+  padding:8px 24px;
+  display:none;
+  align-items:center;gap:14px;font-size:12px;color:rgba(255,255,255,.6);
+}
+#guest-banner strong{color:#fff}
+.gb-signin{
+  padding:5px 12px;background:#107c10;border-radius:5px;
+  font-size:11px;font-weight:700;color:#fff;cursor:pointer;
+  transition:background .15s ease;border:none;font-family:'Inter',sans-serif;
+}
+.gb-signin:hover{background:#0d6e0d}
+
+/* ── CONTROLLER CURSOR OVERLAY ──────────────────────────────── */
+#ctrl-cursor{
+  position:fixed;inset:0;z-index:9999;pointer-events:none;
+  display:none;
+}
+.ctrl-cursor-ring{
+  position:absolute;
+  width:28px;height:28px;
+  border:2px solid rgba(255,255,255,.8);
+  border-radius:50%;
+  transform:translate(-50%,-50%);
+  transition:width .1s,height .1s;
+  box-shadow:0 0 0 1px rgba(0,0,0,.4);
+  pointer-events:none;
+}
+
+/* ── MSAL SETUP GUIDE ───────────────────────────────────────── */
+#setup-guide{
+  background:#1a1f2e;border:1px solid rgba(255,165,0,.3);
+  border-radius:10px;padding:18px;margin-bottom:18px;
+  font-size:12px;color:rgba(255,255,255,.7);line-height:1.8;
+}
+#setup-guide h3{color:#fbbf24;font-size:13px;font-weight:700;margin-bottom:10px}
+#setup-guide code{
+  background:rgba(255,255,255,.08);padding:2px 6px;
+  border-radius:4px;font-family:monospace;color:#a78bfa;
+  font-size:11px;
+}
+#setup-guide ol{padding-left:18px;margin-top:8px}
+#setup-guide li{margin-bottom:6px}
+#setup-guide a{color:#60a5fa;text-decoration:none}
+#setup-guide a:hover{text-decoration:underline}
+.client-id-row{display:flex;gap:8px;margin-top:10px;align-items:center}
+.client-id-row input{
+  flex:1;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+  border-radius:6px;color:#fff;padding:7px 12px;font-size:12px;outline:none;
+  font-family:monospace;
+}
+.client-id-row input:focus{border-color:rgba(255,165,0,.5)}
+.client-id-row button{
+  padding:7px 14px;background:#fbbf24;border-radius:6px;
+  font-size:12px;font-weight:700;color:#000;cursor:pointer;
+  border:none;font-family:'Inter',sans-serif;white-space:nowrap;
+}
+
+/* scrollbar global */
+::-webkit-scrollbar{width:3px;height:3px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+
+/* focus ring global */
+*:focus-visible{outline:2px solid rgba(255,255,255,.8);outline-offset:2px}
+
+/* ── CONTROLLER INDICATOR ─────────────────────────────────────*/
+#ctrl-indicator{
+  position:fixed;top:50%;right:0;
+  transform:translateY(-50%);
+  z-index:9990;display:none;
+  background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.1);
+  border-right:none;border-radius:10px 0 0 10px;
+  padding:10px 12px;
+  display:none;flex-direction:column;gap:8px;
+  font-size:10px;color:rgba(255,255,255,.5);
+}
+#ctrl-indicator.visible{display:flex}
+.ci-row{display:flex;align-items:center;gap:6px}
+.ci-key{
+  width:18px;height:18px;border-radius:4px;
+  background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:800;color:#fff;flex-shrink:0;
+}
+.ci-key.circle{border-radius:50%;background:rgba(235,185,0,.3);border-color:rgba(235,185,0,.5);color:#fbbf24}
+.ci-key.cross{background:rgba(100,150,255,.3);border-color:rgba(100,150,255,.5);color:#93c5fd}
+.ci-key.square{background:rgba(255,100,150,.3);border-color:rgba(255,100,150,.5);color:#f9a8d4}
+.ci-key.triangle{background:rgba(100,220,150,.3);border-color:rgba(100,220,150,.5);color:#86efac}
+</style>
+</head>
+<body>
+
+<!-- Dynamic BG -->
+<div id="bg-art"></div>
+<div id="bg-overlay"></div>
+
+<!-- Controller indicator -->
+<div id="ctrl-indicator">
+  <div class="ci-row"><div class="ci-key cross">✕</div><span>Select / Play</span></div>
+  <div class="ci-row"><div class="ci-key circle">○</div><span>Back / Close</span></div>
+  <div class="ci-row"><div class="ci-key triangle">△</div><span>Menu</span></div>
+  <div class="ci-row"><div class="ci-key square">□</div><span>Add to Library</span></div>
+  <div class="ci-row"><div class="ci-key" style="font-size:7px">L↕R</div><span>Navigate</span></div>
+</div>
+
+<div id="ps5-shell">
+
+  <!-- Auth Modal -->
+  <div class="modal-backdrop" id="auth-modal">
+    <div class="auth-box">
+      <div class="auth-logo">Game<span>Hub</span></div>
+      <div class="auth-sub">Your PS5-style Xbox Cloud Gaming dashboard.<br>Sign in to sync your library everywhere.</div>
+
+      <div id="setup-guide">
+        <h3>🔧 Azure App Setup (One-time)</h3>
+        <ol>
+          <li>Go to <a href="https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps/ApplicationsListBlade" target="_blank">Azure Portal → App Registrations</a></li>
+          <li>Click <strong>New Registration</strong> → Name: <code>GameHub</code></li>
+          <li>Supported account types: <code>Personal Microsoft accounts only</code></li>
+          <li>Redirect URI: <code>Web</code> → your Vercel URL + <code>/auth/callback</code></li>
+          <li>Copy your <strong>Application (client) ID</strong> below:</li>
+        </ol>
+        <div class="client-id-row">
+          <input type="text" id="client-id-input" placeholder="Paste Client ID here…" oninput="setClientId(this.value)">
+          <button onclick="saveClientId()">Save & Sign In</button>
+        </div>
+      </div>
+
+      <button class="ms-login-btn" onclick="signInMicrosoft()">
+        <svg width="20" height="20" viewBox="0 0 24 24"><rect x="1" y="1" width="10" height="10" fill="#F25022"/><rect x="13" y="1" width="10" height="10" fill="#7FBA00"/><rect x="1" y="13" width="10" height="10" fill="#00A4EF"/><rect x="13" y="13" width="10" height="10" fill="#FFB900"/></svg>
+        Continue with Microsoft
+      </button>
+      <div class="auth-divider">or</div>
+      <button class="guest-login-btn" onclick="guestLogin()">Continue as Guest</button>
+    </div>
+  </div>
+
+  <!-- Search Overlay -->
+  <div id="search-overlay" onclick="closeSearchOverlay(event)">
+    <div class="search-wrap">
+      <div class="search-input-row">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="search-input" type="text" placeholder="Search games…" oninput="doSearch(this.value)" autocomplete="off">
+      </div>
+      <div class="search-results" id="search-results">
+        <div class="sr-empty">Start typing to find games…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Launch Modal -->
+  <div class="modal-backdrop" id="launch-modal">
+    <div class="modal-box" style="position:relative">
+      <button class="modal-close" onclick="closeLaunch()">✕</button>
+      <div id="launch-art" style="background:#252b3a;height:200px;display:flex;align-items:center;justify-content:center"></div>
+      <div class="launch-body">
+        <div class="launch-title" id="launch-title"></div>
+        <div class="launch-desc" id="launch-desc"></div>
+        <div class="launch-acts">
+          <button class="ps-btn ps-btn-primary" onclick="confirmLaunch()">▶ Play on Xbox Cloud</button>
+          <button class="ps-btn ps-btn-secondary" onclick="addCurrentToLib()">+ Library</button>
+          <button class="ps-btn ps-btn-secondary" onclick="closeLaunch()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- News Modal -->
+  <div class="modal-backdrop" id="news-modal" onclick="closeNewsModal(event)">
+    <div class="modal-box" style="position:relative;max-width:560px">
+      <button class="modal-close" onclick="closeNewsModal({target:document.getElementById('news-modal')})">✕</button>
+      <div id="news-modal-art" style="height:200px;background:#252b3a;display:flex;align-items:center;justify-content:center;font-size:48px"></div>
+      <div class="news-modal-body">
+        <div class="news-modal-tag" id="nm-tag"></div>
+        <div class="news-modal-title" id="nm-title"></div>
+        <div class="news-modal-text" id="nm-text"></div>
+        <div class="news-modal-date" id="nm-date"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Avatar Modal -->
+  <div class="modal-backdrop" id="avatar-modal" onclick="closeAvatarModal(event)">
+    <div class="modal-box" style="padding:24px;max-width:380px">
+      <h3 style="font-size:16px;font-weight:800;margin-bottom:16px">Choose Avatar</h3>
+      <div class="av-grid" id="av-grid"></div>
+      <label style="display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,.05);border-radius:8px;cursor:pointer;font-size:12px;color:rgba(255,255,255,.6)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Upload custom image
+        <input type="file" accept="image/*" style="display:none" onchange="uploadAvatarFile(this)">
+      </label>
+    </div>
+  </div>
+
+  <!-- Guest Banner -->
+  <div id="guest-banner">
+    <span>👤 Browsing as <strong>Guest</strong> — games open in Xbox Cloud Gaming</span>
+    <button class="gb-signin" onclick="openAuth()">Sign in with Microsoft</button>
+  </div>
+
+  <!-- Top Bar -->
+  <div id="topbar">
+    <div class="topbar-logo">
+      <div class="topbar-logo-icon">G</div>
+      GameHub
+    </div>
+    <div id="main-tabs">
+      <button class="main-tab active" data-page="home" onclick="navTo('home',this)">Games</button>
+      <button class="main-tab" data-page="store" onclick="navTo('store',this)">Store</button>
+      <button class="main-tab" data-page="library" onclick="navTo('library',this)">My Library</button>
+      <button class="main-tab" data-page="news" onclick="navTo('news',this)">News</button>
+      <button class="main-tab" data-page="profile" onclick="navTo('profile',this)">Profile</button>
+      <button class="main-tab" data-page="settings" onclick="navTo('settings',this)">Settings</button>
+    </div>
+    <div id="topbar-right">
+      <button class="tb-icon" onclick="openSearch()" title="Search (Ctrl+K)" aria-label="Search">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      </button>
+      <div id="user-chip" onclick="navTo('profile',null)" tabindex="0" role="button" aria-label="Profile">
+        <div class="uc-avatar" id="uc-avatar-el">👾</div>
+        <span class="uc-name" id="uc-name">Guest</span>
+      </div>
+      <div id="topbar-clock">--:--</div>
+    </div>
+  </div>
+
+  <!-- Content -->
+  <div id="content-area">
+
+    <!-- HOME PAGE -->
+    <div class="page active" id="page-home">
+      <div id="game-strip-wrap">
+        <div id="game-strip" role="listbox" aria-label="Games"></div>
+      </div>
+      <div id="hero-section">
+        <div id="hero-game-art"><img id="hero-art-img" src="" alt=""></div>
+        <div id="hero-info">
+          <img id="hero-game-logo" src="" alt="">
+          <div id="hero-title-text"></div>
+          <div id="hero-subtitle"></div>
+          <div id="hero-meta">
+            <span class="hero-rating" id="hero-rating"></span>
+            <span id="hero-genre-tag"></span>
+            <span id="hero-players"></span>
+          </div>
+          <div id="hero-actions">
+            <button class="ps-btn ps-btn-primary" onclick="launchFocused()">▶ Play Now</button>
+            <button class="ps-btn ps-btn-secondary" id="hero-add-btn" onclick="addFocusedToLib()">+ Add to Library</button>
+            <button class="ps-btn ps-btn-secondary" onclick="openSearch()">🔍 Search</button>
+          </div>
+        </div>
+        <div id="hero-progress">
+          <div class="trophy-stat">
+            <div class="trophy-stat-label">Progress</div>
+            <div class="trophy-stat-value" id="hero-progress-pct">0%</div>
+          </div>
+          <div class="trophy-stat">
+            <div class="trophy-stat-label">Earned</div>
+            <div class="trophy-stat-value" id="hero-earned">0/0</div>
+          </div>
+          <div class="trophy-icon">🏆</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STORE PAGE -->
+    <div class="page" id="page-store">
+      <div class="store-top">
+        <h1>GameHub Store</h1>
+        <div class="store-search-wrap">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="store-search" placeholder="Search Xbox Cloud games…" oninput="filterStore()" autocomplete="off">
+        </div>
+      </div>
+      <div class="genre-filters" id="genre-filters"></div>
+      <div id="store-grid"><div id="store-loading">Loading Xbox Cloud Gaming catalog…</div></div>
+    </div>
+
+    <!-- LIBRARY PAGE -->
+    <div class="page" id="page-library">
+      <div class="lib-toolbar">
+        <h1>My Library</h1>
+        <div class="genre-filters" id="lib-genre-filters" style="margin-bottom:0;flex:1"></div>
+        <div class="layout-btns">
+          <div class="layout-btn active" id="layout-grid-btn" onclick="setLibLayout('grid')" title="Grid" tabindex="0">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></svg>
+          </div>
+          <div class="layout-btn" id="layout-list-btn" onclick="setLibLayout('list')" title="List" tabindex="0">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          </div>
+        </div>
+      </div>
+      <div id="lib-grid" class="store-card-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:14px;overflow-y:auto;flex:1;padding-bottom:12px"></div>
+    </div>
+
+    <!-- NEWS PAGE -->
+    <div class="page" id="page-news">
+      <div class="news-page-title">Gaming News</div>
+      <div id="news-grid"></div>
+    </div>
+
+    <!-- PROFILE PAGE -->
+    <div class="page" id="page-profile">
+      <div class="profile-banner-wrap" id="profile-banner-el">
+        <label class="profile-banner-edit">🖼 Change Banner<input type="file" accept="image/*" style="display:none" onchange="uploadBanner(this)"></label>
+      </div>
+      <div class="profile-top-row">
+        <div class="profile-avatar-wrap">
+          <div class="profile-av" id="profile-av-el" onclick="openAvatarModal()">👾</div>
+          <div class="av-edit-badge" onclick="openAvatarModal()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+        </div>
+        <div class="profile-name-block">
+          <div class="profile-display-name" id="p-display-name">Gamer</div>
+          <div class="profile-handle" id="p-handle">@gamehub_user</div>
+        </div>
+      </div>
+      <div class="profile-stats-row">
+        <div class="prof-stat"><div class="prof-stat-val" id="ps-games">0</div><div class="prof-stat-lbl">Games</div></div>
+        <div class="prof-stat"><div class="prof-stat-val" id="ps-hours">0</div><div class="prof-stat-lbl">Hours</div></div>
+        <div class="prof-stat"><div class="prof-stat-val" id="ps-ach">17</div><div class="prof-stat-lbl">Achievements</div></div>
+        <div class="prof-stat"><div class="prof-stat-val" id="ps-prog">26%</div><div class="prof-stat-lbl">Avg Progress</div></div>
+      </div>
+      <div class="section-heading">Achievements</div>
+      <div class="achievements-grid" id="ach-grid"></div>
+    </div>
+
+    <!-- SETTINGS PAGE -->
+    <div class="page" id="page-settings">
+      <div class="settings-layout">
+        <div class="settings-sidebar">
+          <div class="set-nav-item active" onclick="showSetPanel('appearance',this)" tabindex="0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/></svg>
+            Appearance
+          </div>
+          <div class="set-nav-item" onclick="showSetPanel('account',this)" tabindex="0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            Account
+          </div>
+          <div class="set-nav-item" onclick="showSetPanel('controller',this)" tabindex="0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="6"/><path d="M12 12h.01M8 9v3M7 10.5h2"/><circle cx="16" cy="10" r="1" fill="currentColor"/><circle cx="18" cy="12" r="1" fill="currentColor"/></svg>
+            Controller
+          </div>
+          <div class="set-nav-item" onclick="showSetPanel('notifications',this)" tabindex="0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+            Notifications
+          </div>
+          <div class="set-nav-item" onclick="showSetPanel('privacy',this)" tabindex="0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            Privacy
+          </div>
+          <div class="set-nav-item" onclick="showSetPanel('about',this)" tabindex="0">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            About
+          </div>
+        </div>
+        <div class="settings-panel" id="settings-panel-content"></div>
+      </div>
+    </div>
+
+  </div><!-- /content-area -->
+
+  <!-- Status Bar -->
+  <div id="statusbar">
+    <div class="sb-item"><div class="sb-dot"></div>Xbox Cloud Online</div>
+    <div class="sb-item">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 6s4-2 11-2 11 2 11 2"/><path d="M1 12s4-2 11-2 11 2 11 2"/><circle cx="12" cy="18" r="2"/></svg>
+      Connected
+    </div>
+    <div class="sb-right">
+      <div class="ctrl-hint">
+        <div class="ctrl-btn">↑↓</div> Navigate
+        <div class="ctrl-btn" style="margin-left:4px">↵</div> Select
+        <div class="ctrl-btn" style="margin-left:4px">⎋</div> Back
+        <div class="ctrl-btn" style="margin-left:4px">K</div> Search
+      </div>
+      <div class="sb-item" id="sb-user">Guest</div>
+    </div>
+  </div>
+
+</div><!-- /ps5-shell -->
+
+<!-- Toast container -->
+<div id="toast-wrap"></div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+// CONFIG — Paste your Azure Client ID here (or use the UI above)
+// ═══════════════════════════════════════════════════════════════
+let MSAL_CLIENT_ID = localStorage.getItem('gh_client_id') || '';
+const MSAL_AUTHORITY = 'https://login.microsoftonline.com/consumers';
+const RAWG_KEY = ''; // Get free key at https://rawg.io/apidocs — paste here
+
+// Xbox Cloud Gaming game titles (comprehensive list)
+const XBOX_CLOUD_TITLES = [
+  "Halo Infinite","Forza Horizon 5","Sea of Thieves","Minecraft","Gears 5",
+  "Ori and the Will of the Wisps","The Outer Worlds","Psychonauts 2",
+  "Mass Effect Legendary Edition","Forza Motorsport","Starfield","Redfall",
+  "Hi-Fi RUSH","Pentiment","Grounded","As Dusk Falls","Somerville",
+  "A Plague Tale Innocence","A Plague Tale Requiem","Hollow Knight",
+  "Celeste","Cuphead","Spiritfarer","Disco Elysium",
+  "Control Ultimate Edition","Prey","Dishonored 2","Doom Eternal",
+  "Elder Scrolls Online","Fallout 76","Fallout 4","Fallout New Vegas",
+  "The Elder Scrolls V Skyrim","Wolfenstein 2 The New Colossus",
+  "Quake","Doom 1993","Back 4 Blood","Outriders","Yakuza Like a Dragon",
+  "Yakuza 0","Yakuza Kiwami","Yakuza Kiwami 2","Yakuza 3 Remastered",
+  "Dragon Ball FighterZ","Ace Combat 7","Code Vein","Scarlet Nexus",
+  "Stranger of Paradise Final Fantasy Origin","Final Fantasy XIV Online",
+  "Fortnite","Rocket League","Minecraft Dungeons","Minecraft Legends",
+  "Microsoft Flight Simulator","Age of Empires IV","Age of Empires II Definitive Edition",
+  "Halo 5 Guardians","Halo The Master Chief Collection",
+  "Gears Tactics","Gears of War 4","Gears of War Ultimate Edition",
+  "State of Decay 2","Forza Horizon 4","Forza Horizon 3",
+  "Sunset Overdrive","ReCore","Quantum Break","Ryse Son of Rome",
+  "Dead Island 2","Rainbow Six Siege","The Division 2","Watch Dogs Legion",
+  "Assassin's Creed Odyssey","Assassin's Creed Valhalla","Far Cry 6",
+  "Immortals Fenyx Rising","Just Dance 2023","Riders Republic","Steep",
+  "PGA Tour 2K23","NBA 2K23","FIFA 23","Madden NFL 23","MLB The Show 23",
+  "EA Sports FC 24","F1 23","WRC","Need for Speed Unbound",
+  "Battlefield 2042","Apex Legends","Star Wars Jedi Fallen Order",
+  "Star Wars Jedi Survivor","It Takes Two","A Way Out","Unravel Two",
+  "Lost in Random","Wild Hearts","Dead Space","Skate","The Sims 4",
+  "Lies of P","Wo Long Fallen Dynasty","Nioh 2","Monster Hunter Rise",
+  "Monster Hunter World","Devil May Cry 5","Resident Evil 2",
+  "Resident Evil 3","Resident Evil Village","Street Fighter 6",
+  "Tekken 7","Mortal Kombat 11","Marvel vs Capcom Infinite",
+  "Persona 4 Golden","Persona 5 Royal","Ni no Kuni Wrath of the White Witch",
+  "Dragon Age Inquisition","Dragon Age Origins","Dragon Age 2",
+  "The Witcher 3 Wild Hunt","Cyberpunk 2077","Red Dead Redemption 2",
+  "GTA V","Payday 3","Deep Rock Galactic","Warhammer 40000 Darktide",
+  "Hades","Dead Cells","Slay the Spire","Into the Breach","FTL",
+  "Vampire Survivors","Among Us","Fall Guys","Overcooked 2","Moving Out",
+  "Plague Inc Evolved","Two Point Hospital","Planet Coaster",
+  "Cities Skylines","Frostpunk","This War of Mine","XCOM 2",
+  "Total War Warhammer III","Warhammer 40000 Gladius",
+  "Destiny 2","Warframe","Path of Exile","Diablo IV","Torchlight Infinite",
+  "Tales of Arise","Blue Protocol","Sword Art Online Last Recollection",
+  "One Piece Odyssey","Naruto x Boruto Ultimate Ninja Storm Connections",
+  "My Hero Ultra Rumble","Jump Force","Dragon Ball Xenoverse 2",
+  "Black Desert","Neverwinter","Dungeons and Dragons Dark Alliance",
+  "Baldurs Gate 3","Divinity Original Sin 2","Pillars of Eternity II",
+  "The Ascent","Transistor","Bastion","Pyre","Supergiant Hades",
+  "Tunic","Death's Door","Hollow Knight Silksong","Nine Sols",
+  "Sea of Stars","Chained Echoes","Eastward","CrossCode",
+  "Stardew Valley","My Time at Portia","Coral Island","Sun Haven",
+  "Valheim","Subnautica","Subnautica Below Zero","No Man's Sky",
+  "Planet Crafter","Astroneer","Satisfactory","Dyson Sphere Program",
+  "Minecraft Bedrock","Terraria","Core Keeper","Harvestella",
+];
+
+// ── STATE ──────────────────────────────────────────────────────
+const S = {
+  user: null,
+  isGuest: false,
+  library: JSON.parse(localStorage.getItem('gh_lib') || '[]'),
+  settings: JSON.parse(localStorage.getItem('gh_settings') || JSON.stringify({
+    accent:'#107c10', wallpaper:null, layoutPreset:'carousel',
+    notifs:true, onlineStatus:true, analytics:false,
+    profileName:'Gamer', profileHandle:'@gamehub_user',
+    avatarEmoji:'👾', libLayout:'grid',
+    hoursPlayed:0, ctrlMode:false,
+  })),
+  focusedGameId: null,
+  currentLaunchGame: null,
+  gameCache: JSON.parse(localStorage.getItem('gh_game_cache') || '{}'),
+  storeFilter:'all',
+  libFilter:'all',
+  activePage:'home',
+  activeSettingsPanel:'appearance',
+  // controller nav
+  ctrlFocusable:[],
+  ctrlFocusIdx:0,
+};
+function save(){
+  localStorage.setItem('gh_lib', JSON.stringify(S.library));
+  localStorage.setItem('gh_settings', JSON.stringify(S.settings));
+}
+
+// ── INIT ───────────────────────────────────────────────────────
+window.onload = () => {
+  applySettings();
+  clock();setInterval(clock,1000);
+  setTimeout(()=>{ document.getElementById('auth-modal').classList.add('open'); },500);
+  loadStoreGames();
+  buildNews();
+  buildAchievements();
+  buildAvatarGrid();
+  buildSettingsPanel('appearance');
+  initController();
+};
+
+// ── CLOCK ──────────────────────────────────────────────────────
+function clock(){
+  const n=new Date(),h=n.getHours()%12||12,m=n.getMinutes().toString().padStart(2,'0');
+  document.getElementById('topbar-clock').textContent=`${h}:${m} ${n.getHours()>=12?'PM':'AM'}`;
+}
+
+// ── AUTH ───────────────────────────────────────────────────────
+function openAuth(){ document.getElementById('auth-modal').classList.add('open'); }
+function setClientId(v){ MSAL_CLIENT_ID=v; }
+function saveClientId(){
+  if(!MSAL_CLIENT_ID.trim()){toast('Paste a Client ID first','info');return;}
+  localStorage.setItem('gh_client_id',MSAL_CLIENT_ID.trim());
+  toast('Client ID saved! Redirecting to Microsoft…','success');
+  setTimeout(signInMicrosoft,600);
+}
+function signInMicrosoft(){
+  if(!MSAL_CLIENT_ID.trim()){
+    toast('Add your Azure Client ID first (see setup guide above)','info');
+    return;
+  }
+  const params=new URLSearchParams({
+    client_id: MSAL_CLIENT_ID,
+    response_type:'code',
+    redirect_uri: window.location.origin + '/auth/callback',
+    scope:'XboxLive.signin offline_access openid profile',
+    response_mode:'query',
+  });
+  window.open(`${MSAL_AUTHORITY}/oauth2/v2.0/authorize?${params}`,'_blank');
+  // Simulate local login for UI demo
+  setTimeout(()=>{ finishLogin('Xbox Player','@xboxplayer','👾'); },1000);
+}
+function guestLogin(){
+  document.getElementById('auth-modal').classList.remove('open');
+  S.isGuest=true;
+  document.getElementById('guest-banner').style.display='flex';
+  document.getElementById('sb-user').textContent='Guest';
+  document.getElementById('uc-name').textContent='Guest';
+  toast('Browsing as guest — games will open Xbox Cloud Gaming','info');
+}
+function finishLogin(name,handle,emoji){
+  S.user={name,handle,emoji};S.isGuest=false;
+  document.getElementById('auth-modal').classList.remove('open');
+  document.getElementById('guest-banner').style.display='none';
+  document.getElementById('uc-name').textContent=name;
+  document.getElementById('uc-avatar-el').textContent=emoji;
+  document.getElementById('sb-user').textContent=name+' · Online';
+  S.settings.profileName=name;S.settings.profileHandle=handle;
+  save();toast('Welcome, '+name+'! 👋','success');
+  buildProfile();
+}
+
+// ── NAVIGATION ─────────────────────────────────────────────────
+function navTo(id, btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.main-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  S.activePage=id;
+  if(btn && btn.classList && btn.classList.contains('main-tab')) btn.classList.add('active');
+  else { const t=document.querySelector(`.main-tab[data-page="${id}"]`); if(t) t.classList.add('active'); }
+  if(id==='library') buildLibrary();
+  if(id==='profile') buildProfile();
+  if(id==='news') buildNews();
+  if(id==='settings') buildSettingsPanel(S.activeSettingsPanel);
+  updateCtrlFocusables();
+}
+
+// ── RAWG GAME FETCHING ─────────────────────────────────────────
+const RAWG_BASE = 'https://api.rawg.io/api';
+
+async function fetchGameData(title){
+  if(S.gameCache[title]) return S.gameCache[title];
+  if(!RAWG_KEY){
+    // Return placeholder data without API key
+    const data = makePlaceholderGame(title);
+    S.gameCache[title]=data;
+    return data;
+  }
+  try{
+    const q=encodeURIComponent(title);
+    const r=await fetch(`${RAWG_BASE}/games?key=${RAWG_KEY}&search=${q}&page_size=1&search_precise=true`);
+    const d=await r.json();
+    if(d.results && d.results.length>0){
+      const g=d.results[0];
+      const data={
+        id: g.slug,
+        title: g.name,
+        cover: g.background_image,
+        backdrop: g.background_image,
+        genre: g.genres && g.genres[0] ? g.genres[0].name : 'Game',
+        rating: g.metacritic ? g.metacritic+'/100' : (g.rating ? g.rating.toFixed(1)+'/5' : 'N/A'),
+        desc: g.description_raw ? g.description_raw.substring(0,200)+'…' : 'Play on Xbox Cloud Gaming.',
+        xboxUrl: `https://www.xbox.com/en-US/play/search/${encodeURIComponent(g.name)}`,
+        players: g.playtime ? `~${g.playtime}h` : 'Online',
+      };
+      S.gameCache[title]=data;
+      localStorage.setItem('gh_game_cache', JSON.stringify(S.gameCache));
+      return data;
+    }
+  }catch(e){}
+  const data=makePlaceholderGame(title);
+  S.gameCache[title]=data;
+  return data;
+}
+
+function makePlaceholderGame(title){
+  // Generate a visually distinct placeholder from the title string
+  const colors=[
+    ['#0078D4','#003f8a'],['#107c10','#054005'],['#7c3aed','#3b1a8a'],
+    ['#e74c3c','#7B241C'],['#f97316','#7c3500'],['#0ea5e9','#0369a1'],
+    ['#ec4899','#9d174d'],['#06b6d4','#0e7490'],['#eab308','#854d0e'],
+    ['#22c55e','#14532d'],['#a855f7','#581c87'],['#14b8a6','#115e59'],
+  ];
+  const idx = title.split('').reduce((a,c)=>a+c.charCodeAt(0),0) % colors.length;
+  const [c1,c2]=colors[idx];
+  // Generate a data-URL gradient as cover placeholder
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='200' height='267'>
+    <defs><linearGradient id='g' x1='0%' y1='0%' x2='100%' y2='100%'>
+    <stop offset='0%' stop-color='${c2}'/><stop offset='100%' stop-color='${c1}'/></linearGradient></defs>
+    <rect width='200' height='267' fill='url(%23g)'/>
+    <text x='100' y='134' text-anchor='middle' dominant-baseline='middle' font-family='Inter,sans-serif' font-size='48' fill='white' opacity='0.3'>🎮</text>
+    <text x='100' y='190' text-anchor='middle' font-family='Inter,sans-serif' font-size='11' fill='white' opacity='0.6' font-weight='bold'>${title.substring(0,18)}</text>
+  </svg>`;
+  return {
+    id: title.toLowerCase().replace(/[^a-z0-9]+/g,'-'),
+    title,
+    cover: 'data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg),
+    backdrop: null,
+    genre: guessGenre(title),
+    rating: 'Xbox Cloud',
+    desc: `Play ${title} via Xbox Cloud Gaming — no download required. Stream instantly on any device.`,
+    xboxUrl: `https://www.xbox.com/en-US/play/search/${encodeURIComponent(title)}`,
+    players: 'Cloud Gaming',
+    color1: c1, color2: c2,
+  };
+}
+const GENRE_KEYWORDS = {
+  'Action':['halo','gears','doom','wolfenstein','quake','dead','back 4','outriders','recore','sunset','ryse','control','prey','dishonored','yakuza','devil may cry','resident evil','street fighter','tekken','mortal','marvel vs','wild hearts','wo long','nioh','lies of p'],
+  'Racing':['forza','dirt','f1','wrc','need for speed','motogp','dakar'],
+  'Sports':['fifa','pga','nba','mlb','madden','ea sports','riders republic','steep'],
+  'RPG':['elder scrolls','skyrim','fallout','witcher','cyberpunk','persona','dragon age','baldur','divinity','pillars','mass effect','outer worlds','monster hunter','tales of','one piece','naruto','yakuza like','scarlet nexus','code vein','blue protocol','final fantasy','ni no kuni'],
+  'Shooter':['apex','battlefield','rainbow six','division','halo','doom','wolfenstein','back 4 blood','warframe','destiny','payday','warhammer 40000 darktide','deep rock'],
+  'Adventure':['sea of thieves','a plague tale','hollow knight','death','ori','psychonauts','tunic','death door','nine sols','sea of stars'],
+  'Simulation':['microsoft flight','sims','planet coaster','cities','stardew','my time','planet crafter','astroneer','satisfactory','dyson'],
+  'Indie':['celeste','cuphead','spiritfarer','disco','hades','dead cells','slay the spire','into the breach','vampire survivors','among us','fall guys','valheim','subnautica','terraria','core keeper'],
+};
+function guessGenre(title){
+  const t=title.toLowerCase();
+  for(const[genre,kw] of Object.entries(GENRE_KEYWORDS)){
+    if(kw.some(k=>t.includes(k))) return genre;
+  }
+  return 'Game';
+}
+
+// ── STORE ──────────────────────────────────────────────────────
+let storeGames=[];
+let storeLoaded=false;
+
+async function loadStoreGames(){
+  const grid=document.getElementById('store-grid');
+  // Build placeholder games immediately
+  storeGames = XBOX_CLOUD_TITLES.map(makePlaceholderGame);
+  storeLoaded=true;
+  buildGenreFilters();
+  renderStore();
+  buildHomeStrip();
+  // Now try RAWG if key exists
+  if(RAWG_KEY){
+    const loader=document.getElementById('store-loading');
+    if(loader) loader.textContent='Fetching covers from RAWG…';
+    // Batch fetch first 40 for speed
+    const batch=XBOX_CLOUD_TITLES.slice(0,40);
+    await Promise.allSettled(batch.map(async(title,i)=>{
+      const data=await fetchGameData(title);
+      storeGames[i]=data;
+    }));
+    renderStore();
+    buildHomeStrip();
+    // Fetch rest in background
+    for(let i=40;i<XBOX_CLOUD_TITLES.length;i++){
+      fetchGameData(XBOX_CLOUD_TITLES[i]).then(d=>{ storeGames[i]=d; });
+    }
+  }
+}
+
+const ALL_GENRES=['All','Action','Racing','Sports','RPG','Shooter','Adventure','Simulation','Indie'];
+function buildGenreFilters(){
+  document.getElementById('genre-filters').innerHTML = ALL_GENRES.map((g,i)=>
+    `<button class="genre-btn ${i===0?'active':''}" onclick="setStoreGenre('${g}',this)">${g}</button>`
+  ).join('');
+}
+function setStoreGenre(g,btn){
+  S.storeFilter=g;
+  document.getElementById('genre-filters').querySelectorAll('.genre-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderStore();
+}
+function filterStore(){
+  renderStore();
+}
+function renderStore(){
+  const q=(document.getElementById('store-search')||{}).value||'';
+  const filt=S.storeFilter==='All'?storeGames:storeGames.filter(g=>g.genre===S.storeFilter);
+  const shown=q?filt.filter(g=>g.title.toLowerCase().includes(q.toLowerCase())):filt;
+  const grid=document.getElementById('store-grid');
+  if(!shown.length){grid.innerHTML='<div style="grid-column:1/-1;text-align:center;padding:60px;color:rgba(255,255,255,.3)">No games found.</div>';return;}
+  grid.style.display='grid';
+  grid.innerHTML=shown.map(g=>storeCardHTML(g)).join('');
+}
+function storeCardHTML(g){
+  const inLib=S.library.includes(g.id);
+  return `<div class="store-card" onclick="openLaunch('${esc(g.id)}')" tabindex="0" role="listitem" aria-label="${esc(g.title)}">
+    <img class="store-card-img" src="${g.cover}" alt="${esc(g.title)}" loading="lazy" onerror="this.src='${makeFallbackSVG(g)}'">
+    <div class="store-card-body">
+      <div class="store-card-title">${g.title}</div>
+      <div class="store-card-genre">${g.genre}</div>
+      <button class="store-add-btn ${inLib?'in-lib':''}" onclick="event.stopPropagation();toggleLib('${esc(g.id)}')">${inLib?'✓ In Library':'+ Add'}</button>
+    </div>
+  </div>`;
+}
+function makeFallbackSVG(g){
+  return g.cover; // fallback to same (already placeholder)
+}
+
+// ── HOME STRIP (PS5) ───────────────────────────────────────────
+let stripGames=[];
+let focusIdx=0;
+
+function buildHomeStrip(){
+  stripGames=storeGames.slice(0,Math.min(30,storeGames.length));
+  const strip=document.getElementById('game-strip');
+  strip.innerHTML=stripGames.map((g,i)=>`
+    <div class="ps-card ${i===0?'focused':''}" id="strip-card-${i}"
+      tabindex="0" role="option" aria-selected="${i===0}"
+      onclick="focusCard(${i});launchFocused()"
+      onmouseenter="focusCard(${i})"
+      onkeydown="handleCardKey(event,${i})"
+      aria-label="${esc(g.title)}">
+      <div class="ps-card-inner">
+        <img class="ps-card-img" src="${g.cover}" alt="${esc(g.title)}" loading="lazy">
+      </div>
+      <div class="ps-card-label ${i===0?'focused-label':''}">${g.title}</div>
+    </div>
+  `).join('');
+  focusCard(0);
+}
+function focusCard(i){
+  if(!stripGames[i]) return;
+  // Remove focus from all
+  document.querySelectorAll('.ps-card').forEach((c,j)=>{
+    c.classList.toggle('focused',j===i);
+    c.querySelector('.ps-card-label').classList.toggle('focused-label',j===i);
+    c.setAttribute('aria-selected',j===i);
+  });
+  focusIdx=i;
+  S.focusedGameId=stripGames[i].id;
+  updateHero(stripGames[i]);
+  // Scroll card into view
+  const card=document.getElementById('strip-card-'+i);
+  if(card) card.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+}
+function updateHero(g){
+  // Background art
+  if(g.backdrop || g.cover){
+    document.getElementById('bg-art').style.backgroundImage=`url(${g.backdrop||g.cover})`;
+  }
+  // Hero text
+  document.getElementById('hero-title-text').textContent=g.title;
+  document.getElementById('hero-subtitle').textContent=g.desc;
+  document.getElementById('hero-rating').textContent=g.rating;
+  document.getElementById('hero-genre-tag').textContent=g.genre;
+  document.getElementById('hero-players').textContent=g.players||'Cloud Gaming';
+  // Hero art (character image attempt)
+  const artImg=document.getElementById('hero-art-img');
+  if(g.backdrop){
+    artImg.src=g.backdrop;
+    artImg.classList.add('visible');
+  } else {
+    artImg.classList.remove('visible');
+  }
+  // Progress
+  const prog=Math.floor(Math.random()*80)+10;
+  document.getElementById('hero-progress-pct').textContent=prog+'%';
+  document.getElementById('hero-earned').textContent=Math.floor(prog/5)+'/50';
+  // Add button state
+  const inLib=S.library.includes(g.id);
+  document.getElementById('hero-add-btn').textContent=inLib?'✓ In Library':'+ Add to Library';
+}
+function launchFocused(){
+  const g=getGame(S.focusedGameId);
+  if(g) openLaunch(g.id);
+}
+function addFocusedToLib(){
+  if(S.focusedGameId) toggleLib(S.focusedGameId,true);
+}
+function handleCardKey(e,i){
+  if(e.key==='Enter'||e.key===' '){ e.preventDefault(); focusCard(i); openLaunch(stripGames[i].id); }
+  if(e.key==='ArrowRight'){ e.preventDefault(); focusCard(Math.min(i+1,stripGames.length-1)); }
+  if(e.key==='ArrowLeft'){ e.preventDefault(); focusCard(Math.max(i-1,0)); }
+}
+
+// ── LAUNCH MODAL ───────────────────────────────────────────────
+function getGame(id){ return storeGames.find(g=>g.id===id); }
+function openLaunch(id){
+  const g=getGame(id);
+  if(!g) return;
+  S.currentLaunchGame=g;
+  const art=document.getElementById('launch-art');
+  art.style.backgroundImage=`url(${g.cover})`;
+  art.style.backgroundSize='cover';
+  art.style.backgroundPosition='center';
+  art.innerHTML='';
+  document.getElementById('launch-title').textContent=g.title;
+  document.getElementById('launch-desc').textContent=g.desc;
+  document.getElementById('launch-modal').classList.add('open');
+}
+function closeLaunch(){ document.getElementById('launch-modal').classList.remove('open'); S.currentLaunchGame=null; }
+function confirmLaunch(){
+  const g=S.currentLaunchGame;if(!g)return;
+  closeLaunch();
+  toast('Launching '+g.title+' on Xbox Cloud… 🚀','success');
+  S.settings.hoursPlayed=(S.settings.hoursPlayed||0)+1; save();
+  document.getElementById('ps-hours').textContent=S.settings.hoursPlayed;
+  setTimeout(()=>window.open(g.xboxUrl,'_blank'),500);
+}
+function addCurrentToLib(){
+  const g=S.currentLaunchGame;if(!g)return;
+  toggleLib(g.id,true);
+}
+
+// ── LIBRARY ────────────────────────────────────────────────────
+function toggleLib(id,addOnly=false){
+  const inLib=S.library.includes(id);
+  if(inLib && !addOnly){ S.library=S.library.filter(x=>x!==id); save(); toast('Removed from library','info'); }
+  else if(!inLib){ S.library.push(id); save(); toast('Added to library! 🎮','success'); }
+  else{ toast('Already in library','info'); }
+  renderStore();
+  if(S.activePage==='library') buildLibrary();
+  document.getElementById('ps-games').textContent=S.library.length;
+  const hero=document.getElementById('hero-add-btn');
+  if(hero && S.focusedGameId===id) hero.textContent=S.library.includes(id)?'✓ In Library':'+ Add to Library';
+}
+function buildLibrary(){
+  const grid=document.getElementById('lib-grid');
+  const games=storeGames.filter(g=>S.library.includes(g.id));
+  const filt=S.libFilter==='all'?games:games.filter(g=>g.genre===S.libFilter);
+  // Build genre filter for library
+  const lf=document.getElementById('lib-genre-filters');
+  if(lf && !lf.children.length){
+    lf.innerHTML=`<button class="genre-btn active" onclick="setLibFilter('all',this)">All</button>`+
+      [...new Set(games.map(g=>g.genre))].map(g=>`<button class="genre-btn" onclick="setLibFilter('${g}',this)">${g}</button>`).join('');
+  }
+  if(!filt.length){
+    grid.innerHTML=`<div class="lib-empty">
+      <h3>${S.library.length?'No games in this category':'Library is empty'}</h3>
+      <p>${S.library.length?'Try a different filter.':'Head to the Store to add Xbox Cloud games.'}</p>
+      <button class="ps-btn ps-btn-primary" style="display:inline-flex;margin-top:4px" onclick="navTo('store',null)">Browse Store</button>
+    </div>`;
+    return;
+  }
+  const isListView=S.settings.libLayout==='list';
+  if(isListView){
+    grid.style.gridTemplateColumns='1fr';
+    grid.innerHTML=filt.map(g=>`
+      <div class="store-card" style="display:flex;flex-direction:row" onclick="openLaunch('${esc(g.id)}')" tabindex="0">
+        <img class="store-card-img" src="${g.cover}" style="width:72px;height:72px;aspect-ratio:auto;flex-shrink:0" alt="${esc(g.title)}" loading="lazy">
+        <div class="store-card-body" style="flex:1;display:flex;align-items:center;gap:16px">
+          <div style="flex:1"><div class="store-card-title">${g.title}</div><div class="store-card-genre">${g.genre}</div></div>
+          <button class="store-add-btn" style="width:auto;padding:7px 16px;margin-top:0;background:rgba(239,68,68,.7)" onclick="event.stopPropagation();toggleLib('${esc(g.id)}')">Remove</button>
+        </div>
+      </div>`).join('');
+  } else {
+    grid.style.gridTemplateColumns='repeat(auto-fill,minmax(148px,1fr))';
+    grid.innerHTML=filt.map(g=>storeCardHTML(g)).join('');
+  }
+}
+function setLibFilter(f,btn){
+  S.libFilter=f;
+  document.getElementById('lib-genre-filters').querySelectorAll('.genre-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  buildLibrary();
+}
+function setLibLayout(l){
+  S.settings.libLayout=l; save();
+  document.getElementById('layout-grid-btn').classList.toggle('active',l==='grid');
+  document.getElementById('layout-list-btn').classList.toggle('active',l==='list');
+  buildLibrary();
+}
+
+// ── NEWS ───────────────────────────────────────────────────────
+const NEWS=[
+  {id:1,tag:'Updates',title:'Halo Infinite Season 5 Launches with Massive Content Drop',date:'June 20, 2026',emoji:'🎮',text:'The latest Halo Infinite season brings new maps, weapons, and the much-anticipated Forge mode improvements. Players can expect hundreds of hours of new content across both multiplayer and co-op modes. 343 Industries confirmed 4 new maps and 3 new game modes launching alongside the season pass.'},
+  {id:2,tag:'DLC',title:'Forza Horizon 5 Rally Adventure Expanded with 10 New Cars',date:'June 18, 2026',emoji:'🏎️',text:'Take on treacherous terrain in brand-new Rally Adventure expansion packs featuring 10 new cars and 5 massive off-road environments across different Mexican biomes. The update is free for all Game Pass subscribers.'},
+  {id:3,tag:'Game Pass',title:'Xbox Game Pass Adds 25 New Titles in July 2026',date:'June 15, 2026',emoji:'📦',text:'Microsoft announces 25 new day-one titles coming to Xbox Game Pass in July, including several major RPGs and action adventures from top studios worldwide. Starfield expansions lead the lineup.'},
+  {id:4,tag:'Cloud',title:'Xbox Cloud Gaming Now Available in 50+ Countries',date:'June 12, 2026',emoji:'🌐',text:'Microsoft expands Xbox Cloud Gaming to over 50 new countries, making console-quality gaming accessible worldwide on any device with a browser. 1080p streaming now available in all regions.'},
+  {id:5,tag:'Update',title:'Minecraft Legends Gets Major Free Update with New Biomes',date:'June 8, 2026',emoji:'⛏️',text:'Minecraft Legends receives a sweeping free update adding 6 new biomes, 12 new mobs, and an entirely revamped campaign mode with improved AI and multiplayer features for up to 8 players.'},
+  {id:6,tag:'Reveal',title:"Bethesda Reveals Elder Scrolls VI Release Window",date:'June 5, 2026',emoji:'⚔️',text:'After years of anticipation, Bethesda Game Studios has officially confirmed a release window for The Elder Scrolls VI. The game is expected to launch exclusively on Xbox and PC as part of Microsoft\'s Game Pass.'},
+];
+function buildNews(){
+  document.getElementById('news-grid').innerHTML=NEWS.map(n=>`
+    <div class="news-card" onclick="openNewsModal(${n.id})" tabindex="0" role="article">
+      <div class="news-card-thumb" style="background:linear-gradient(135deg,#1a1f2e,#252b3a);display:flex;align-items:center;justify-content:center;font-size:56px">${n.emoji}</div>
+      <div class="news-card-body">
+        <div class="news-card-tag">${n.tag}</div>
+        <div class="news-card-title">${n.title}</div>
+        <div class="news-card-date">${n.date}</div>
+      </div>
+    </div>`).join('');
+}
+function openNewsModal(id){
+  const n=NEWS.find(x=>x.id===id);if(!n)return;
+  const art=document.getElementById('news-modal-art');
+  art.style.background='linear-gradient(135deg,#1a1f2e,#252b3a)';
+  art.style.display='flex';art.style.alignItems='center';art.style.justifyContent='center';art.style.fontSize='72px';
+  art.textContent=n.emoji;
+  document.getElementById('nm-tag').textContent=n.tag;
+  document.getElementById('nm-title').textContent=n.title;
+  document.getElementById('nm-text').textContent=n.text;
+  document.getElementById('nm-date').textContent=n.date;
+  document.getElementById('news-modal').classList.add('open');
+}
+function closeNewsModal(e){
+  if(e.target===document.getElementById('news-modal')||e.target.classList.contains('modal-close'))
+    document.getElementById('news-modal').classList.remove('open');
+}
+
+// ── PROFILE ────────────────────────────────────────────────────
+function buildProfile(){
+  document.getElementById('p-display-name').textContent=S.settings.profileName;
+  document.getElementById('p-handle').textContent=S.settings.profileHandle;
+  document.getElementById('ps-games').textContent=S.library.length;
+  document.getElementById('ps-hours').textContent=S.settings.hoursPlayed||0;
+  buildAchievements();
+}
+function uploadBanner(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    document.getElementById('profile-banner-el').style.backgroundImage=`url(${e.target.result})`;
+    document.getElementById('profile-banner-el').style.backgroundSize='cover';
+    document.getElementById('profile-banner-el').style.backgroundPosition='center';
+    toast('Banner updated!','success');
+  };r.readAsDataURL(f);
+}
+function openAvatarModal(){
+  document.getElementById('avatar-modal').classList.add('open');
+}
+function closeAvatarModal(e){
+  if(e.target===document.getElementById('avatar-modal')) document.getElementById('avatar-modal').classList.remove('open');
+}
+function buildAvatarGrid(){
+  const emojis=['🎮','🕹️','👾','🚀','⚡','🔥','💎','🦊','🐉','🤖','🎯','🌟','🦅','🐺','🏆','🎪','🌊','🎭'];
+  document.getElementById('av-grid').innerHTML=emojis.map(e=>`
+    <div class="av-opt ${S.settings.avatarEmoji===e?'active':''}" onclick="pickAvatar('${e}')">${e}</div>
+  `).join('');
+}
+function pickAvatar(e){
+  S.settings.avatarEmoji=e;save();
+  document.getElementById('profile-av-el').textContent=e;
+  document.getElementById('uc-avatar-el').textContent=e;
+  document.getElementById('avatar-modal').classList.remove('open');
+  toast('Avatar updated!','success');
+}
+function uploadAvatarFile(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    const av=document.getElementById('profile-av-el');
+    av.innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+    document.getElementById('uc-avatar-el').innerHTML=`<img src="${e.target.result}" style="width:100%;height:100%;object-fit:cover">`;
+    document.getElementById('avatar-modal').classList.remove('open');
+    toast('Avatar updated!','success');
+  };r.readAsDataURL(f);
+}
+
+// ── ACHIEVEMENTS ───────────────────────────────────────────────
+const ACHS=[
+  {icon:'🏆',title:'First Victory',desc:'Win your first online match',p:100},
+  {icon:'⚡',title:'Speed Demon',desc:'Finish a race in under 2 minutes',p:100},
+  {icon:'🗺️',title:'Explorer',desc:'Discover 10 hidden locations',p:100},
+  {icon:'🎯',title:'Sharpshooter',desc:'50 headshots in any game',p:100},
+  {icon:'🛡️',title:'Defender',desc:'Block 100 enemy attacks',p:35},
+  {icon:'🌟',title:'Legend',desc:'Reach max rank in any game',p:10},
+  {icon:'🤝',title:'Team Player',desc:'Complete 25 co-op missions',p:20},
+  {icon:'💎',title:'Collector',desc:'Add 10 games to your library',p:Math.min(100,S.library.length*10)},
+];
+function buildAchievements(){
+  ACHS[7].p=Math.min(100,S.library.length*10);
+  document.getElementById('ach-grid').innerHTML=ACHS.map(a=>`
+    <div class="ach-card ${a.p<100?'ach-locked':''}">
+      <div class="ach-icon">${a.icon}</div>
+      <div class="ach-info">
+        <h4>${a.title}</h4>
+        <p>${a.desc}</p>
+        <div class="ach-bar"><div class="ach-fill" style="width:${a.p}%"></div></div>
+      </div>
+    </div>`).join('');
+  document.getElementById('ps-ach').textContent=ACHS.filter(a=>a.p>=100).length;
+}
+
+// ── SETTINGS ───────────────────────────────────────────────────
+const ACCENTS=[
+  {n:'Xbox Green',v:'#107c10'},{n:'Sky Blue',v:'#0ea5e9'},{n:'Purple',v:'#7c3aed'},
+  {n:'Orange',v:'#f97316'},{n:'Pink',v:'#ec4899'},{n:'Red',v:'#ef4444'},
+  {n:'Cyan',v:'#06b6d4'},{n:'Gold',v:'#eab308'},
+];
+function showSetPanel(id,btn){
+  S.activeSettingsPanel=id;
+  document.querySelectorAll('.set-nav-item').forEach(i=>i.classList.remove('active'));
+  btn.classList.add('active');
+  buildSettingsPanel(id);
+}
+function buildSettingsPanel(id){
+  const c=document.getElementById('settings-panel-content');if(!c)return;
+  const s=S.settings;
+  if(id==='appearance'){
+    c.innerHTML=`<div class="set-panel-title">Appearance</div>
+      <div class="set-row">
+        <div><div class="set-row-lbl">Accent Color</div><div class="set-row-desc">Primary highlight color throughout GameHub</div>
+          <div class="color-swatches" style="margin-top:12px">${ACCENTS.map(a=>`<div class="cswatch ${s.accent===a.v?'active':''}" style="background:${a.v}" onclick="setAccent('${a.v}')" title="${a.n}"></div>`).join('')}</div>
+        </div>
+      </div>
+      <div class="set-row">
+        <div><div class="set-row-lbl">Wallpaper</div><div class="set-row-desc">Custom background image</div></div>
+        <div class="set-ctrl"><div class="wallpaper-actions">
+          <label class="set-btn">📁 Upload<input type="file" accept="image/*" style="display:none" onchange="uploadWallpaper(this)"></label>
+          ${s.wallpaper?`<button class="set-btn" onclick="clearWallpaper()">✕ Clear</button>`:''}
+        </div></div>
+      </div>
+      <div class="set-row">
+        <div><div class="set-row-lbl">RAWG API Key</div><div class="set-row-desc">Get free key at <a href="https://rawg.io/apidocs" target="_blank" style="color:#60a5fa">rawg.io/apidocs</a> for real game covers</div></div>
+        <div class="set-ctrl">
+          <div style="display:flex;gap:8px">
+            <input class="set-input" id="rawg-key-input" placeholder="Paste RAWG API key…" style="width:220px" value="${localStorage.getItem('gh_rawg_key')||''}">
+            <button class="set-btn" onclick="saveRawgKey()">Save</button>
+          </div>
+        </div>
+      </div>`;
+  } else if(id==='account'){
+    c.innerHTML=`<div class="set-panel-title">Account</div>
+      <div class="set-row">
+        <div><div class="set-row-lbl">Display Name</div></div>
+        <div class="set-ctrl"><input class="set-input" value="${s.profileName}" oninput="s.profileName=this.value;save();document.getElementById('p-display-name').textContent=this.value;document.getElementById('uc-name').textContent=this.value"></div>
+      </div>
+      <div class="set-row">
+        <div><div class="set-row-lbl">Gamertag</div></div>
+        <div class="set-ctrl"><input class="set-input" value="${s.profileHandle}" oninput="s.profileHandle=this.value;save();document.getElementById('p-handle').textContent=this.value"></div>
+      </div>
+      <div class="set-row">
+        <div><div class="set-row-lbl">Azure Client ID</div><div class="set-row-desc">For Microsoft OAuth</div></div>
+        <div class="set-ctrl"><div style="display:flex;gap:8px"><input class="set-input" id="cid-input2" value="${MSAL_CLIENT_ID}" placeholder="Azure Client ID…" style="width:220px"><button class="set-btn" onclick="MSAL_CLIENT_ID=document.getElementById('cid-input2').value;localStorage.setItem('gh_client_id',MSAL_CLIENT_ID);toast('Client ID saved!','success')">Save</button></div></div>
+      </div>
+      <div class="set-row">
+        <div><div class="set-row-lbl">Clear Library</div><div class="set-row-desc">Remove all games</div></div>
+        <div class="set-ctrl"><button class="set-btn" style="border-color:rgba(239,68,68,.4);color:#f87171" onclick="clearLib()">Clear All</button></div>
+      </div>`;
+  } else if(id==='controller'){
+    c.innerHTML=`<div class="set-panel-title">Controller & Keyboard</div>
+      <div class="set-row">
+        <div><div class="set-row-lbl">Controller Mode</div><div class="set-row-desc">Show controller hints and indicator panel</div></div>
+        <div class="set-ctrl"><div class="toggle ${s.ctrlMode?'on':''}" onclick="toggleCtrlMode(this)"></div></div>
+      </div>
+      <div style="margin-top:16px;background:rgba(255,255,255,.04);border-radius:10px;padding:16px">
+        <div style="font-size:12px;font-weight:700;color:rgba(255,255,255,.7);margin-bottom:12px">Keyboard Shortcuts</div>
+        ${[['← → Arrow Keys','Navigate game cards'],['Enter / Space','Select / Play game'],['Escape','Close modals / Go back'],['Ctrl + K','Open search'],['Tab','Navigate between UI elements'],['1-6 Number Keys','Switch pages (Home, Store, Library…)'],['A','Add focused game to library'],].map(([k,d])=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+            <span style="font-size:12px;color:rgba(255,255,255,.5)">${d}</span>
+            <span style="font-size:11px;font-weight:700;background:rgba(255,255,255,.08);padding:3px 8px;border-radius:5px;color:rgba(255,255,255,.7)">${k}</span>
+          </div>`).join('')}
+        <div style="margin-top:12px;font-size:12px;font-weight:700;color:rgba(255,255,255,.7);margin-bottom:12px">Gamepad Mapping</div>
+        ${[['Left Stick / D-Pad','Navigate'],['A / Cross (✕)','Select / Play'],['B / Circle (○)','Back / Close'],['X / Square (□)','Add to Library'],['Y / Triangle (△)','Open Menu'],['LB / RB','Switch Tabs'],].map(([k,d])=>`
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)">
+            <span style="font-size:12px;color:rgba(255,255,255,.5)">${d}</span>
+            <span style="font-size:11px;font-weight:700;background:rgba(255,255,255,.08);padding:3px 8px;border-radius:5px;color:rgba(255,255,255,.7)">${k}</span>
+          </div>`).join('')}
+      </div>`;
+  } else if(id==='notifications'){
+    c.innerHTML=`<div class="set-panel-title">Notifications</div>
+      ${setToggle('Notifications','Enable all notifications','notifs')}
+      ${setToggle('Game Alerts','Notify when friends are playing','gameAlerts')}
+      ${setToggle('News Feed','Show latest gaming news','showNews')}
+      ${setToggle('Auto-play','Play trailers on hover','autoPlay')}`;
+  } else if(id==='privacy'){
+    c.innerHTML=`<div class="set-panel-title">Privacy</div>
+      ${setToggle('Online Status','Show status to others','onlineStatus')}
+      ${setToggle('Share Activity','Let friends see what you play','shareActivity')}
+      ${setToggle('Analytics','Help improve GameHub','analytics')}`;
+  } else if(id==='about'){
+    c.innerHTML=`<div class="set-panel-title">About GameHub</div>
+      ${[['Version','GameHub v2.0 — Complete Rebuild'],['Platform','Xbox Cloud Gaming via xcloud'],['Covers','RAWG.io game database API'],['Auth','Microsoft Identity Platform (MSAL)'],['Deploy','Vercel — one-click deployment'],].map(([l,v])=>`
+        <div class="set-row"><div><div class="set-row-lbl">${l}</div><div class="set-row-desc">${v}</div></div></div>`).join('')}
+      <div class="set-row">
+        <div><div class="set-row-lbl">Deploy to Vercel</div><div class="set-row-desc">Host your own GameHub publicly</div></div>
+        <div class="set-ctrl"><button class="ps-btn ps-btn-secondary" style="font-size:12px;padding:8px 14px" onclick="window.open('https://vercel.com/new','_blank')">Deploy ↗</button></div>
+      </div>`;
+  }
+}
+function setToggle(lbl,desc,key){
+  const v=S.settings[key]!==false;
+  return `<div class="set-row">
+    <div><div class="set-row-lbl">${lbl}</div><div class="set-row-desc">${desc}</div></div>
+    <div class="set-ctrl"><div class="toggle ${v?'on':''}" onclick="S.settings['${key}']=!S.settings['${key}'];this.classList.toggle('on',S.settings['${key}']);save()"></div></div>
+  </div>`;
+}
+function setAccent(v){
+  S.settings.accent=v;save();
+  document.documentElement.style.setProperty('--accent',v);
+  // Update sidebar active indicator
+  document.querySelector('#genre-filters .genre-btn.active')||'';
+  toast('Accent color updated!','success');
+  buildSettingsPanel('appearance');
+}
+function toggleCtrlMode(el){
+  S.settings.ctrlMode=!S.settings.ctrlMode;
+  el.classList.toggle('on',S.settings.ctrlMode);
+  save();
+  document.getElementById('ctrl-indicator').classList.toggle('visible',S.settings.ctrlMode);
+  toast(S.settings.ctrlMode?'Controller hints enabled':'Controller hints off','info');
+}
+function uploadWallpaper(input){
+  const f=input.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=e=>{
+    S.settings.wallpaper=e.target.result;save();
+    document.getElementById('bg-art').style.backgroundImage=`url(${e.target.result})`;
+    toast('Wallpaper updated!','success');
+    buildSettingsPanel('appearance');
+  };r.readAsDataURL(f);
+}
+function clearWallpaper(){
+  S.settings.wallpaper=null;save();
+  // Restore game art
+  const g=getGame(S.focusedGameId);
+  if(g) document.getElementById('bg-art').style.backgroundImage=`url(${g.backdrop||g.cover})`;
+  toast('Wallpaper cleared','info');
+  buildSettingsPanel('appearance');
+}
+function saveRawgKey(){
+  const v=document.getElementById('rawg-key-input').value.trim();
+  localStorage.setItem('gh_rawg_key',v);
+  toast('RAWG key saved! Reloading covers…','success');
+  location.reload();
+}
+function clearLib(){
+  if(!confirm('Remove all games from library?'))return;
+  S.library=[];save();
+  document.getElementById('ps-games').textContent='0';
+  buildLibrary();renderStore();
+  toast('Library cleared','info');
+}
+function applySettings(){
+  const s=S.settings;
+  if(s.accent) document.documentElement.style.setProperty('--accent',s.accent);
+  if(s.wallpaper) document.getElementById('bg-art').style.backgroundImage=`url(${s.wallpaper})`;
+  if(s.avatarEmoji){
+    document.getElementById('uc-avatar-el').textContent=s.avatarEmoji;
+    document.getElementById('profile-av-el').textContent=s.avatarEmoji;
+  }
+  if(s.profileName) document.getElementById('uc-name').textContent=s.profileName;
+  document.getElementById('ps-hours').textContent=s.hoursPlayed||0;
+  if(s.ctrlMode) document.getElementById('ctrl-indicator').classList.add('visible');
+}
+
+// ── SEARCH ─────────────────────────────────────────────────────
+function openSearch(){
+  document.getElementById('search-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('search-input').focus(),50);
+}
+function closeSearchOverlay(e){
+  if(e.target===document.getElementById('search-overlay'))
+    document.getElementById('search-overlay').classList.remove('open');
+}
+function doSearch(q){
+  const c=document.getElementById('search-results');
+  if(!q.trim()){c.innerHTML='<div class="sr-empty">Start typing to find games…</div>';return;}
+  const games=storeGames.filter(g=>g.title.toLowerCase().includes(q.toLowerCase())).slice(0,8);
+  const news=NEWS.filter(n=>n.title.toLowerCase().includes(q.toLowerCase()));
+  if(!games.length&&!news.length){c.innerHTML='<div class="sr-empty">No results for "'+q+'"</div>';return;}
+  let html='';
+  if(games.length) html+=`<div class="sr-section-label">Games</div>`;
+  html+=games.map(g=>`
+    <div class="sr-item" onclick="openLaunch('${esc(g.id)}');document.getElementById('search-overlay').classList.remove('open')">
+      <img class="sr-thumb" src="${g.cover}" alt="${esc(g.title)}" loading="lazy">
+      <div class="sr-info"><h4>${g.title}</h4><p>${g.genre} · ${S.library.includes(g.id)?'✓ In Library':'Xbox Cloud'}</p></div>
+    </div>`).join('');
+  if(news.length) html+=`<div class="sr-section-label">News</div>`;
+  html+=news.map(n=>`
+    <div class="sr-item" onclick="openNewsModal(${n.id});document.getElementById('search-overlay').classList.remove('open')">
+      <div class="sr-thumb" style="background:linear-gradient(135deg,#1a1f2e,#252b3a);display:flex;align-items:center;justify-content:center;font-size:22px">${n.emoji}</div>
+      <div class="sr-info"><h4>${n.title}</h4><p>${n.tag} · ${n.date}</p></div>
+    </div>`).join('');
+  c.innerHTML=html;
+}
+
+// ── TOAST ──────────────────────────────────────────────────────
+function toast(msg,type='info'){
+  const w=document.getElementById('toast-wrap');
+  const t=document.createElement('div');
+  t.className=`toast ${type}`;
+  t.innerHTML=`${type==='success'?'✅':'ℹ️'} <span>${msg}</span>`;
+  w.appendChild(t);
+  setTimeout(()=>{t.classList.add('removing');setTimeout(()=>t.remove(),300);},2800);
+}
+
+// ── UTILS ──────────────────────────────────────────────────────
+function esc(s){ return String(s).replace(/'/g,"\\'").replace(/</g,'&lt;'); }
+
+// ── KEYBOARD CONTROL ───────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const tag=(document.activeElement||{}).tagName;
+  const inInput=tag==='INPUT'||tag==='TEXTAREA';
+
+  // Global shortcuts (even in inputs)
+  if((e.ctrlKey||e.metaKey)&&e.key==='k'){ e.preventDefault(); openSearch(); return; }
+
+  if(!inInput){
+    if(e.key==='Escape'){
+      document.getElementById('search-overlay').classList.remove('open');
+      document.getElementById('launch-modal').classList.remove('open');
+      document.getElementById('news-modal').classList.remove('open');
+      document.getElementById('avatar-modal').classList.remove('open');
+      return;
+    }
+    // Number shortcuts for pages
+    const pages=['home','store','library','news','profile','settings'];
+    if(e.key>='1'&&e.key<='6'){ navTo(pages[parseInt(e.key)-1],null); return; }
+    // Home page card navigation
+    if(S.activePage==='home'){
+      if(e.key==='ArrowRight'){ focusCard(Math.min(focusIdx+1,stripGames.length-1)); return; }
+      if(e.key==='ArrowLeft'){ focusCard(Math.max(focusIdx-1,0)); return; }
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); launchFocused(); return; }
+      if(e.key==='a'||e.key==='A'){ addFocusedToLib(); return; }
+    }
+  }
+});
+
+// ── GAMEPAD SUPPORT ────────────────────────────────────────────
+(function initGamepad(){
+  let lastTime=0;
+  const DEAD=0.3, REPEAT=180;
+  let btnState={};
+  let axisHeld={};
+
+  function pollGamepad(){
+    const gamepads=navigator.getGamepads ? navigator.getGamepads() : [];
+    for(const gp of gamepads){
+      if(!gp) continue;
+      const now=Date.now();
+
+      // Axes (left stick + d-pad via buttons)
+      const ax0=gp.axes[0]||0, ax1=gp.axes[1]||0;
+
+      // Left (axis or d-pad left button 14)
+      const goLeft=ax0<-DEAD||gp.buttons[14]?.pressed;
+      const goRight=ax0>DEAD||gp.buttons[15]?.pressed;
+      const goUp=ax1<-DEAD||gp.buttons[12]?.pressed;
+      const goDown=ax1>DEAD||gp.buttons[13]?.pressed;
+
+      if(goLeft&&(!axisHeld.left||now-axisHeld.left>REPEAT)){
+        axisHeld.left=now;
+        if(S.activePage==='home') focusCard(Math.max(focusIdx-1,0));
+        else focusPrev();
+      } else if(!goLeft){ axisHeld.left=0; }
+
+      if(goRight&&(!axisHeld.right||now-axisHeld.right>REPEAT)){
+        axisHeld.right=now;
+        if(S.activePage==='home') focusCard(Math.min(focusIdx+1,stripGames.length-1));
+        else focusNext();
+      } else if(!goRight){ axisHeld.right=0; }
+
+      if(goUp&&(!axisHeld.up||now-axisHeld.up>REPEAT)){
+        axisHeld.up=now; focusPrev();
+      } else if(!goUp){ axisHeld.up=0; }
+
+      if(goDown&&(!axisHeld.down||now-axisHeld.down>REPEAT)){
+        axisHeld.down=now; focusNext();
+      } else if(!goDown){ axisHeld.down=0; }
+
+      // Buttons (fire once)
+      gp.buttons.forEach((btn,i)=>{
+        const wasPressed=btnState[i];
+        if(btn.pressed && !wasPressed){
+          btnState[i]=true;
+          handleGpBtn(i);
+        }
+        if(!btn.pressed) btnState[i]=false;
+      });
+    }
+    requestAnimationFrame(pollGamepad);
+  }
+
+  function handleGpBtn(i){
+    // 0=A/Cross, 1=B/Circle, 2=X/Square, 3=Y/Triangle
+    // 4=LB, 5=RB, 8=Select/Back, 9=Start/Menu
+    if(i===0){ // A = Select/Play
+      const focused=document.querySelector('.ps-card.focused, .store-card:focus, .news-card:focus');
+      if(focused){ focused.click(); return; }
+      if(S.activePage==='home') launchFocused();
+    }
+    if(i===1){ // B = Back/Close
+      const modals=['launch-modal','search-overlay','news-modal','avatar-modal'];
+      for(const m of modals){
+        const el=document.getElementById(m);
+        if(el && el.classList.contains('open')){el.classList.remove('open');return;}
+      }
+    }
+    if(i===2){ // X = Add to library
+      if(S.activePage==='home') addFocusedToLib();
+    }
+    if(i===3){ // Y = Search/Menu
+      openSearch();
+    }
+    if(i===4){ // LB — prev tab
+      const tabs=['home','store','library','news','profile','settings'];
+      const cur=tabs.indexOf(S.activePage);
+      if(cur>0) navTo(tabs[cur-1],null);
+    }
+    if(i===5){ // RB — next tab
+      const tabs=['home','store','library','news','profile','settings'];
+      const cur=tabs.indexOf(S.activePage);
+      if(cur<tabs.length-1) navTo(tabs[cur+1],null);
+    }
+    if(i===9){ // Start
+      navTo('settings',null);
+    }
+  }
+
+  function focusNext(){
+    const el=document.activeElement;
+    const all=getFocusableEls();
+    const idx=all.indexOf(el);
+    if(idx<all.length-1) all[idx+1].focus();
+    else if(all.length) all[0].focus();
+  }
+  function focusPrev(){
+    const el=document.activeElement;
+    const all=getFocusableEls();
+    const idx=all.indexOf(el);
+    if(idx>0) all[idx-1].focus();
+    else if(all.length) all[all.length-1].focus();
+  }
+  function getFocusableEls(){
+    const page=document.getElementById('page-'+S.activePage);
+    if(!page) return [];
+    return Array.from(page.querySelectorAll('[tabindex="0"],button:not(:disabled),a[href],input:not(:disabled),select:not(:disabled)'))
+      .filter(el=>{ const r=el.getBoundingClientRect(); return r.width>0&&r.height>0; });
+  }
+
+  window.addEventListener('gamepadconnected', e=>{
+    toast('🎮 Controller connected: '+e.gamepad.id.substring(0,30),'success');
+    S.settings.ctrlMode=true;save();
+    document.getElementById('ctrl-indicator').classList.add('visible');
+    buildSettingsPanel('controller');
+  });
+  window.addEventListener('gamepaddisconnected', e=>{
+    toast('Controller disconnected','info');
+  });
+
+  requestAnimationFrame(pollGamepad);
+})();
+
+function initController(){
+  if(S.settings.ctrlMode){
+    document.getElementById('ctrl-indicator').classList.add('visible');
+  }
+}
+</script>
+</body>
+</html>
+HTMLEOF
+echo "Done. File size: $(wc -c < /mnt/user-data/outputs/gamehub.html) bytes"
+Output
